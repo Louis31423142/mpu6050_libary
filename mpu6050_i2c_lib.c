@@ -10,31 +10,11 @@
 #include "pico/binary_info.h"
 #include "hardware/i2c.h"
 #include "mpu6050_i2c_lib.h"
+#include <math.h>
 
-/* Example code to talk to a MPU6050 MEMS accelerometer and gyroscope
-
-   This is taking to simple approach of simply reading registers. It's perfectly
-   possible to link up an interrupt line and set things up to read from the
-   inbuilt FIFO to make it more useful.
-
-   NOTE: Ensure the device is capable of being driven at 3.3v NOT 5v. The Pico
-   GPIO (and therefore I2C) cannot be used at 5v.
-
-   You will need to use a level shifter on the I2C lines if you want to run the
-   board at 5v.
-
-   Connections on Raspberry Pi Pico board, other boards may vary.
-
-   GPIO PICO_DEFAULT_I2C_SDA_PIN (On Pico this is GP4 (pin 6)) -> SDA on MPU6050 board
-   GPIO PICO_DEFAULT_I2C_SCL_PIN (On Pico this is GP5 (pin 7)) -> SCL on MPU6050 board
-   3.3v (pin 36) -> VCC on MPU6050 board
-   GND (pin 38)  -> GND on MPU6050 board
-*/
-
-// By default these devices  are on bus address 0x68
+// Defualt address 
 static int addr = 0x68;
 
-//#ifdef i2c_default
 void mpu6050_reset(void) {
     // Two byte reset. First byte register, second byte data
     // There are a load more options to set up the device in different ways that could be added here
@@ -148,4 +128,41 @@ int mpu6050_initialise(int SDA_pin, int SCL_pin, int GYRO_FS, int ACCEL_FS) {
 
 
     return 0;
+}
+
+// function takes NUM sensor readings to get gyro offsets
+// returns roll_offset, pitch_offset
+void mpu6050_get_gyro_offset(int NUM, float *roll_offset, float *pitch_offset) {
+    float r_offset = 0;
+    float p_offset = 0;
+    int16_t acceleration[3], gyro[3], temp;
+
+    for (int i = 0; i < NUM; i++) {
+        mpu6050_read_raw(acceleration, gyro, &temp);
+        r_offset += (gyro[0] / 32768.0 * 250.0)/NUM;
+        p_offset += (gyro[1] / 32768.0 * 250.0)/NUM;
+    }
+
+    printf("roll offset %f\n", roll_offset);
+    printf("pitch offset %f\n", pitch_offset);
+
+    *roll_offset = r_offset;
+    *pitch_offset = p_offset;
+}
+
+// function outputs roll, pitch using sensor fusion
+void mpu6050_fusion_output(float roll_offset, float pitch_offset, float alpha, int delta_ms, float *roll, float *pitch) {
+    int16_t acceleration[3], gyro[3], temp;
+    mpu6050_read_raw(acceleration, gyro, &temp);
+    // calculate pitch and roll from accelerometer o/p
+    // this calculation is independent of full scale
+    float accel_roll = atan2(acceleration[1] , acceleration[2]) * 57.3;
+    float accel_pitch = atan2((- acceleration[0]) , sqrt(acceleration[1] * acceleration[1] + acceleration[2] * acceleration[2])) * 57.3;
+
+    float roll_rate = gyro[0] / 32768.0 * 250.0 - roll_offset;
+    float pitch_rate = gyro[1] / 32768.0 * 250.0 - pitch_offset;
+
+    // calculate pitch and roll using sensor fusion (complimentary filter)
+    *roll = (1 - alpha) * (*roll + roll_rate * delta_ms/1000) + alpha * accel_roll;
+    *pitch = (1 - alpha) * (*pitch + pitch_rate * delta_ms/1000) + alpha * accel_pitch;    
 }
