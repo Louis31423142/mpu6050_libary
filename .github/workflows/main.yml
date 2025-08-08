@@ -1,0 +1,32 @@
+name: Pigweed runner
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  run-python-on-selfhosted:
+    runs-on: self-hosted 
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Build changes
+        run: |
+          cd ~/runner_build/MPU6050
+          rm -rf build 
+          mkdir build 
+          cd build 
+          export PICO_SDK_PATH=~/pico/pico-sdk
+          cmake .. -DPICO_BOARD=pigweed_dut
+          make -j4
+          
+      - name: Run Python script
+        run: python3 ~/pigweed_tests/auto-tester.py --dut ttyACM0 --buddy ttyACM1 --root ~/runner_build/MPU6050/build
+
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ~/pigweed_tests/results.json
+        
