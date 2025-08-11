@@ -22,7 +22,7 @@ jobs:
           make -j4
           
       - name: Run Python script
-        run: python3 ~/pigweed_tests/auto-tester.py --dut ttyACM0 --buddy ttyACM1 --root ~/runner_build/mpu6050_libary/build
+        run: python3 ~/pigweed_tests/auto-tester.py --dut ttyACM0 --buddy ttyACM1 --root ~/runner_build/mpu6050_libary/build/mpu6050_i2c.elf
 
       - name: Upload results as artifact
         uses: actions/upload-artifact@v4
