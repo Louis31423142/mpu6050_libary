@@ -1,0 +1,8 @@
+[
+    {
+        "dut_file": "~/runner_build/mpu6050_libary/build/mpu6050_libary.elf"
+        "buddy_file": "NULL",
+        "success_string": "",
+        "test_name": "TEST"
+    }
+]
